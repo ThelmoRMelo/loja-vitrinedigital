@@ -3,7 +3,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Send, MessageCircle, Loader2, ArrowLeft, ShoppingBag, Trash2, Mic, Square, X } from 'lucide-react';
+import { Send, MessageCircle, Loader2, ArrowLeft, ShoppingBag, Trash2, Mic, Square, X, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MarkdownMessage } from '@/components/MarkdownMessage';
@@ -16,7 +16,10 @@ import { toast } from 'sonner';
 import { ProductGalleryViewer, ProductGalleryPreview } from '@/components/ProductGalleryViewer';
 import { CatalogCards } from '@/components/chat/CatalogCards';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
-import { SpeakButton } from '@/components/chat/SpeakButton';
+import { SpeakButton, playMessageSpeech, stopMessageSpeech, cleanTextForSpeech } from '@/components/chat/SpeakButton';
+
+// Chave estável da preferência de áudio automático (padrão: ativado)
+const AUTO_SPEAK_KEY = 'ania_auto_speak_enabled';
 
 
 const CATALOG_MARKER = '__CATALOG__';
