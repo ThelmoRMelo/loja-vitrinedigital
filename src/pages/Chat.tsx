@@ -84,6 +84,53 @@ export default function Chat() {
   const initializedConvRef = useRef<string | null>(null);
   const isInitializingRef = useRef(false);
 
+  // Áudio automático da última resposta da ANIA (padrão: ativado; preferência persistida)
+  const [autoSpeakEnabled, setAutoSpeakEnabled] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(AUTO_SPEAK_KEY);
+      return saved === null ? true : saved === 'true';
+    } catch {
+      return true;
+    }
+  });
+  // ID da última mensagem de bot que já recebeu reprodução automática (anti-duplicidade)
+  const lastAutoSpokenMessageIdRef = useRef<string | null>(null);
+
+  const handleToggleAutoSpeak = () => {
+    setAutoSpeakEnabled((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(AUTO_SPEAK_KEY, String(next));
+      } catch {
+        // localStorage indisponível — mantém apenas em memória
+      }
+      if (!next) stopMessageSpeech();
+      return next;
+    });
+  };
+
+  // Reproduz automaticamente APENAS a última mensagem válida do bot,
+  // uma única vez por mensagem. Ignora catálogo e textos vazios após limpeza.
+  useEffect(() => {
+    if (!autoSpeakEnabled) return;
+
+    const lastBotMessage = [...messages]
+      .reverse()
+      .find((m) => m.sender === 'bot' && m.content !== CATALOG_MARKER);
+
+    if (!lastBotMessage) return;
+    if (lastAutoSpokenMessageIdRef.current === lastBotMessage.id) return;
+    if (!cleanTextForSpeech(lastBotMessage.content)) return;
+
+    // Marca ANTES de falar para que re-renderizações não disparem de novo
+    lastAutoSpokenMessageIdRef.current = lastBotMessage.id;
+    void playMessageSpeech(lastBotMessage.id, lastBotMessage.content, {
+      voice: config?.assistant_voice,
+      instructions: config?.assistant_voice_style,
+      speed: config?.assistant_voice_speed,
+    });
+  }, [messages, autoSpeakEnabled, config?.assistant_voice, config?.assistant_voice_style, config?.assistant_voice_speed]);
+
   // Gravação de voz -> transcrição preenche o campo de texto (usuário revisa e envia)
   const voice = useVoiceRecorder({
     onTranscript: (text) => {
