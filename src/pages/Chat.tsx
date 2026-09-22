@@ -3,7 +3,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Send, MessageCircle, Loader2, ArrowLeft, ShoppingBag, Trash2, Mic, Square, X } from 'lucide-react';
+import { Send, MessageCircle, Loader2, ArrowLeft, ShoppingBag, Trash2, Mic, Square, X, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MarkdownMessage } from '@/components/MarkdownMessage';
@@ -16,7 +16,10 @@ import { toast } from 'sonner';
 import { ProductGalleryViewer, ProductGalleryPreview } from '@/components/ProductGalleryViewer';
 import { CatalogCards } from '@/components/chat/CatalogCards';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
-import { SpeakButton } from '@/components/chat/SpeakButton';
+import { SpeakButton, playMessageSpeech, stopMessageSpeech, cleanTextForSpeech } from '@/components/chat/SpeakButton';
+
+// Chave estável da preferência de áudio automático (padrão: ativado)
+const AUTO_SPEAK_KEY = 'ania_auto_speak_enabled';
 
 
 const CATALOG_MARKER = '__CATALOG__';
@@ -80,6 +83,53 @@ export default function Chat() {
   // re-renders, async timing of addMessage, or multiple effect runs after clearing.
   const initializedConvRef = useRef<string | null>(null);
   const isInitializingRef = useRef(false);
+
+  // Áudio automático da última resposta da ANIA (padrão: ativado; preferência persistida)
+  const [autoSpeakEnabled, setAutoSpeakEnabled] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(AUTO_SPEAK_KEY);
+      return saved === null ? true : saved === 'true';
+    } catch {
+      return true;
+    }
+  });
+  // ID da última mensagem de bot que já recebeu reprodução automática (anti-duplicidade)
+  const lastAutoSpokenMessageIdRef = useRef<string | null>(null);
+
+  const handleToggleAutoSpeak = () => {
+    setAutoSpeakEnabled((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(AUTO_SPEAK_KEY, String(next));
+      } catch {
+        // localStorage indisponível — mantém apenas em memória
+      }
+      if (!next) stopMessageSpeech();
+      return next;
+    });
+  };
+
+  // Reproduz automaticamente APENAS a última mensagem válida do bot,
+  // uma única vez por mensagem. Ignora catálogo e textos vazios após limpeza.
+  useEffect(() => {
+    if (!autoSpeakEnabled) return;
+
+    const lastBotMessage = [...messages]
+      .reverse()
+      .find((m) => m.sender === 'bot' && m.content !== CATALOG_MARKER);
+
+    if (!lastBotMessage) return;
+    if (lastAutoSpokenMessageIdRef.current === lastBotMessage.id) return;
+    if (!cleanTextForSpeech(lastBotMessage.content)) return;
+
+    // Marca ANTES de falar para que re-renderizações não disparem de novo
+    lastAutoSpokenMessageIdRef.current = lastBotMessage.id;
+    void playMessageSpeech(lastBotMessage.id, lastBotMessage.content, {
+      voice: config?.assistant_voice,
+      instructions: config?.assistant_voice_style,
+      speed: config?.assistant_voice_speed,
+    });
+  }, [messages, autoSpeakEnabled, config?.assistant_voice, config?.assistant_voice_style, config?.assistant_voice_speed]);
 
   // Gravação de voz -> transcrição preenche o campo de texto (usuário revisa e envia)
   const voice = useVoiceRecorder({
@@ -244,6 +294,10 @@ export default function Chat() {
 
     setIsClearing(true);
     try {
+      // Interrompe qualquer áudio em reprodução e reseta o controle de auto-fala,
+      // permitindo que a nova mensagem de boas-vindas seja tratada como nova resposta
+      stopMessageSpeech();
+      lastAutoSpokenMessageIdRef.current = null;
       // Invalida o guard atual para permitir nova inicialização
       initializedConvRef.current = null;
       await clearConversation();
@@ -440,7 +494,24 @@ export default function Chat() {
             <Trash2 className="w-5 h-5" />
           )}
         </Button>
-        
+
+        {/* Botão áudio automático das respostas da ANIA */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleToggleAutoSpeak}
+          className="hover:bg-muted/50 transition-colors"
+          title={autoSpeakEnabled ? 'Áudio automático ativado' : 'Áudio automático desativado'}
+          aria-label={autoSpeakEnabled ? 'Áudio automático ativado' : 'Áudio automático desativado'}
+          aria-pressed={autoSpeakEnabled}
+        >
+          {autoSpeakEnabled ? (
+            <Volume2 className="w-5 h-5" />
+          ) : (
+            <VolumeX className="w-5 h-5 text-muted-foreground" />
+          )}
+        </Button>
+
         {/* Link para ver produtos */}
         <Link to={vitrineLink} className="p-2 hover:bg-muted/50 rounded-full transition-colors">
           <ShoppingBag className="w-5 h-5 text-muted-foreground" />
