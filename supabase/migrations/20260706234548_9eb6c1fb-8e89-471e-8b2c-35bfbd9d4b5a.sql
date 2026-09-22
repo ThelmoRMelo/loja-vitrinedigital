@@ -1,2 +1,0 @@
-ALTER TABLE public.products ADD COLUMN IF NOT EXISTS is_hero boolean NOT NULL DEFAULT false;
-CREATE UNIQUE INDEX IF NOT EXISTS products_unique_hero_per_tenant ON public.products (tenant_id) WHERE is_hero = true;
