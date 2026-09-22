@@ -294,6 +294,10 @@ export default function Chat() {
 
     setIsClearing(true);
     try {
+      // Interrompe qualquer áudio em reprodução e reseta o controle de auto-fala,
+      // permitindo que a nova mensagem de boas-vindas seja tratada como nova resposta
+      stopMessageSpeech();
+      lastAutoSpokenMessageIdRef.current = null;
       // Invalida o guard atual para permitir nova inicialização
       initializedConvRef.current = null;
       await clearConversation();
@@ -490,7 +494,24 @@ export default function Chat() {
             <Trash2 className="w-5 h-5" />
           )}
         </Button>
-        
+
+        {/* Botão áudio automático das respostas da ANIA */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleToggleAutoSpeak}
+          className="hover:bg-muted/50 transition-colors"
+          title={autoSpeakEnabled ? 'Áudio automático ativado' : 'Áudio automático desativado'}
+          aria-label={autoSpeakEnabled ? 'Áudio automático ativado' : 'Áudio automático desativado'}
+          aria-pressed={autoSpeakEnabled}
+        >
+          {autoSpeakEnabled ? (
+            <Volume2 className="w-5 h-5" />
+          ) : (
+            <VolumeX className="w-5 h-5 text-muted-foreground" />
+          )}
+        </Button>
+
         {/* Link para ver produtos */}
         <Link to={vitrineLink} className="p-2 hover:bg-muted/50 rounded-full transition-colors">
           <ShoppingBag className="w-5 h-5 text-muted-foreground" />
